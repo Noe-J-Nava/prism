@@ -1,0 +1,6 @@
+data/raw/
+
+output/mgwr_crops
+
+## Gitgnorable R stuff
+.Rproj.user/
