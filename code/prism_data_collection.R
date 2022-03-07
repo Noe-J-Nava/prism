@@ -1,19 +1,28 @@
+# Noé J Nava
+# Noe.Nava@usda.gov
+# ERS - MTED - APM
+
+# Note:
+# Script downloads data from Oregon's PRISM: Climate Group. 
+# I download daily values for precipitation, maximum and minimum temperatures
+# from 1992 - 2020.
+
 rm(list = ls())
 
-# Script downloads prism data for precipitation, minimum and maximum temperature at the daily resolution.
-# Focus is on Growing season only: April 1 to September 30 based on the work of Burke and Emerick (2016)
+# Settings:
+fromYear       <- 1992       # Year collection starts
+toYear         <- 2020       # Year collection ends
+leftInterval   <- "-01-01"   # First day of the year format "-mm-dd"
+rightInterval  <- "-12-31"   # First day of the year format "-mm-dd"
 
 library(prism)
 
-vars <- c("ppt",  #precipitation
-          "tmin", #Minimum temperature
-          "tmax"  #Maximum temperature
+vars <- c("ppt",  # Precipitation
+          "tmin", # Minimum temperature
+          "tmax"  # Maximum temperature
           )
 
-years <- seq(from = 1994, to = 1998)
-years <- append(years, 
-                seq(from = 2014,
-                    to   = 2018 ))
+years <- seq(from = fromYear, to = toYear)
 years <- as.character(years)
 
 for(var in vars) {
@@ -32,8 +41,8 @@ for(var in vars) {
   prism_set_dl_dir(dir)
   
   for(year in years) {
-    minDate <- paste(year, "-04-01", sep = "")
-    maxDate <- paste(year, "-09-30", sep = "")
+    minDate <- paste(year, leftInterval, sep = "")
+    maxDate <- paste(year, rightInterval, sep = "")
 
     print(var)
     print(year)
