@@ -5,6 +5,8 @@
 # Note:
 # Script process PRISM data to be used in ag. econ analyses that require 
 # gdd, edd and ppt.
+# I am including the trigonometric approximation of Snyder (1985) to crops's
+# heat exposure at the hourly level with just Tmax and Tmin
 # One dataset per commodity is created to be used in a SQL dataset
 
 # Ppt is "daily total precipitation (rain + melted snow)" --- unit is mm
@@ -30,6 +32,42 @@ commodityList_10C  <- c("corn",
 commodityList <- append(commodityList_4.4C, commodityList_10C)
 
 # GDD and EDD functions
+# Heating degree days piecewise function approximation
+heatingEDD.function <- function(tmin, tmax, upp) {
+  # Case 1: upp =< Tmin
+  edd1 <- 0.5*(tmax + tmin) - upp
+  
+  # Case 2: Tmin < upp < Tmax
+  tbar <- acos((2*upp - tmax - tmin)/(tmax - tmin))
+  edd2 <- (tbar/pi)*((0.5*(tmax + tmin)) - upp) + sin(tbar)*((tmax - tmin)/(2*pi))
+  
+  # Case 3: Tmax =< upp
+  edd3 <- 0
+  
+  edd <- ifelse(upp <= tmin, edd1, ifelse((upp > tmin) & (tmax > upp), edd2, ifelse(tmax <= upp, edd3, NA)))
+  
+  return(edd)
+}
+
+heatingGDD.function <- function(tmin, tmax, low, upp) {
+  # Case 1: low =< Tmin
+  gdd1 <- 0.5*(tmax + tmin) - low
+  
+  # Case 2: Tmin < low < Tmax
+  tbar <- acos((2*low - tmax - tmin)/(tmax - tmin))
+  gdd2 <- (tbar/pi)*((0.5*(tmax + tmin)) - low) + sin(tbar)*((tmax - tmin)/(2*pi))
+  
+  # Case 3: Tmax =< low
+  gdd3 <- 0
+  
+  gdd <- ifelse(low <= tmin, gdd1, ifelse((low > tmin) & (tmax > low), gdd2, ifelse(tmax <= low, gdd3, NA)))
+  
+  edd <- heatingEDD.function(tmin, tmax, upp)
+  gdd <- gdd - edd
+  
+  return(gdd)
+}
+
 gdd.function <- function(tmin, tmax, tbase) {
   
   taverage <- .5*(tmax + tmin)
@@ -71,7 +109,8 @@ for(commodity in commodityList) {
   gc()
   
   # Creating edd and gdd specific to commodity
-  if(commodity %in% commodityList_4.4C) { tbase <- 4.4 }else{ tbase <- 10 }
+  if(commodity %in% commodityList_4.4C) { low <- 4.4 }else{ low <- 10 }
+  upp <- 30 # always 30
   
   df_tmin <- readRDS(file = "data/processed/df_tmin.rds")
   df_tmax <- readRDS(file = "data/processed/df_tmax.rds")
@@ -80,10 +119,15 @@ for(commodity in commodityList) {
   rm(list = c("df_tmin", "df_tmax"))
   gc()
 
+  df_dd <- df_dd %>% mutate(low = low)
+  df_dd <- df_dd %>% mutate(upp = upp)
+  
   df_dd <- df_dd %>%
-    mutate(gdd = gdd.function(tmin, tmax, tbase)) %>%
+    mutate(gdd = gdd.function(tmin, tmax, low)) %>%
     mutate(edd = edd.function(tmin, tmax)) %>%
-    select(fips, date, gdd, edd)
+    mutate(gdd2 = heatingGDD.function(tmin, tmax, low, upp)) %>%
+    mutate(edd2 = heatingEDD.function(tmin, tmax, upp)) %>%
+    select(fips, date, gdd, edd, gdd2, edd2)
   
   dataset <- left_join(dataset, df_dd, by = c("fips", "date"))
   rm(list = "df_dd")
